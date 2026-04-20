@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Practica03_FactorialRecursivo.vcxproj" Id="a74f80dc-fe65-4f54-8535-7cd105321fe2" />
+</Solution>
