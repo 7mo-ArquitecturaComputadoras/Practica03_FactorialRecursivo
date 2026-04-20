@@ -100,5 +100,3 @@ El factorial de 6 es: 720
 - **Compilador:** MSVC (Visual Studio) con soporte para ensamblado MASM
 - **Arquitectura:** x86 (32 bits), modo protegido plano (`flat`)
 - **Estándar C++:** C++11 o superior
-# Practica03_FactorialRecursivo
-# Practica03_FactorialRecursivo
