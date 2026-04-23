@@ -802,7 +802,6 @@ jspm_packages/
 *.pdfsync      
 
 # --- Salidas de compilación ---
-*.pdf
 *.dvi
 *.ps
 *.eps
