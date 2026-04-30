@@ -1,14 +1,20 @@
-# Practica 03 — Factorial Recursivo en Ensamblador x86 (FPU)
+# Práctica 02 — Promedio de Números Enteros con Signo en Ensamblador x86
 
 ## Descripción
 
-Programa en C++ que delega el cálculo del **factorial** a una función implementada en ensamblador x86, haciendo uso de la **Unidad de Punto Flotante (FPU)** mediante instrucciones del coprocesador matemático 80387.
+Programa en ensamblador x86 que recorre un arreglo de números enteros con signo almacenado en memoria, acumula su suma y calcula el promedio aritmético mediante división entera con signo, operando directamente sobre los registros del procesador.
 
-La función implementa el factorial de forma **recursiva**, siguiendo la definición matemática:
+El cálculo se realiza en dos etapas:
 
 ```
-x! = x * (x-1)!     si x > 1
-x! = 1              si x <= 1  (caso base)
+Etapa 1 — Suma acumulada:
+    Para cada elemento en Dato[0..n-1]:
+        EAX += Dato[i]    →  acumulador de 32 bits con signo
+
+Etapa 2 — División entera con signo:
+    CDQ                   →  extiende EAX a EDX:EAX (64 bits)
+    IDIV Cantidad         →  EAX = cociente (Promedio)
+                             EDX = resto    (Residuo)
 ```
 
 ---
@@ -16,87 +22,108 @@ x! = 1              si x <= 1  (caso base)
 ## Estructura del Proyecto
 
 ```
-Practica03_FactorialRecursivo/
-├── main.cpp         # Programa principal: entrada/salida y llamada a la función ASM
-└── Factorial.asm    # Implementación recursiva de Mi_fact en ensamblador x86
+Practica02_Promedio/
+└── promedio.asm    # Programa principal: recorre el arreglo, suma y calcula el promedio
 ```
 
 ---
 
-## Interfaz entre C++ y Ensamblador
+## Interfaz y Convención de Llamada
 
-La función se declara en C++ con `extern "C"` para que MASM pueda enlazarla sin decoración de nombres:
+El programa es autocontenido: declara el arreglo y las variables de resultado en la sección `.data` y los procesa directamente en `start`. Al finalizar, invoca `ExitProcess@4` de la WinAPI para cerrar el proceso limpiamente.
 
-```cpp
-extern "C" double Mi_fact(double x);
-```
+| Elemento    | Descripción                                                              |
+|-------------|--------------------------------------------------------------------------|
+| `Dato`      | Arreglo de 6 enteros con signo (`SDWORD`) declarado en `.data`           |
+| `Cantidad`  | Constante calculada en tiempo de ensamblado: `($ - Dato) / 4`           |
+| `Promedio`  | Variable `SDWORD` donde se almacena el cociente de la división           |
+| `Residuo`   | Variable `SDWORD` donde se almacena el resto de la división              |
+| `ESI`       | Registro puntero que recorre el arreglo elemento a elemento              |
+| `ECX`       | Registro contador del ciclo; decrementado automáticamente por `LOOP`     |
+| `EAX`       | Acumulador de la suma; contiene el cociente (promedio) tras `IDIV`       |
+| `EDX`       | Recibe la extensión de signo vía `CDQ`; contiene el resto tras `IDIV`    |
+| `EBX`       | Almacena el divisor (`Cantidad`) para la instrucción `IDIV`              |
 
-### Convención de llamada (`model flat, c`)
-
-El parámetro `double` (64 bits) se pasa por la pila. El valor de retorno se deja en `ST(0)`, que es el mecanismo estándar para devolver `double` en x86 de 32 bits.
-
-| Función   | Parámetro | Ubicación en pila |
-|-----------|-----------|-------------------|
-| `Mi_fact` | `x`       | `[EBP + 8]`       |
+La directiva `.model flat, stdcall` indica modelo de memoria plana con la convención de llamadas estándar de Windows.
 
 ---
 
-## Funcionamiento de Mi_fact
+## Funcionamiento del Algoritmo
 
-La función sigue el esquema clásico de recursión en pila. En cada llamada se reservan 8 bytes locales (`SUB ESP, 8`) para almacenar temporalmente el valor `x - 1.0` antes de pasarlo como argumento a la siguiente llamada recursiva.
+El programa implementa un ciclo de acumulación seguido de una división entera con signo. El ciclo recorre cada elemento del arreglo sumándolo a `EAX`; al terminar, `CDQ` prepara el dividendo de 64 bits e `IDIV` produce cociente y resto.
 
 ### Flujo de ejecución
 
 ```
-Mi_fact(x)
- ├─ ¿x <= 1.0? → caso base → retorna 1.0
- └─ x > 1.0   → paso recursivo:
-       1. Calcula (x - 1.0) y lo guarda localmente
-       2. Llama Mi_fact(x - 1.0)
-       3. Multiplica el resultado por x
-       4. Retorna x * Mi_fact(x - 1.0)
+Inicio
+ └─ ESI = dirección de Dato
+ └─ ECX = Cantidad
+ └─ EAX = 0
+
+sumar:
+ ├─ EAX += [ESI]
+ ├─ ESI += 4
+ └─ LOOP sumar        (ECX--; si ECX > 0, repetir)
+
+ ├─ CDQ               →  EDX:EAX = extensión de signo de EAX
+ ├─ IDIV EBX          →  EAX = cociente, EDX = resto
+ ├─ Promedio = EAX
+ └─ Residuo  = EDX
+
+finalizar:
+ └─ ExitProcess@4(0)
 ```
 
-### Ejemplo con x = 4.0
+### Ejemplo con el arreglo `{-10, 20, -30, 40, -50, 60}`
 
-```
-Mi_fact(4.0)
- └─ 4.0 * Mi_fact(3.0)
-         └─ 3.0 * Mi_fact(2.0)
-                  └─ 2.0 * Mi_fact(1.0)
-                            └─ caso base → 1.0
-                  = 2.0 * 1.0 = 2.0
-         = 3.0 * 2.0 = 6.0
- = 4.0 * 6.0 = 24.0  ✓
-```
+| Iteración | Elemento | Acumulador (EAX) | ECX restante |
+|-----------|----------|------------------|--------------|
+| 1         | −10      | −10              | 5            |
+| 2         | +20      | +10              | 4            |
+| 3         | −30      | −20              | 3            |
+| 4         | +40      | +20              | 2            |
+| 5         | −50      | −30              | 1            |
+| 6         | +60      | +30              | 0            |
+
+División: `30 ÷ 6 = 5` (cociente), `30 mod 6 = 0` (resto)
+
+| Variable   | Valor almacenado |
+|------------|-----------------|
+| `Promedio` | `5`             |
+| `Residuo`  | `0`             |
 
 ---
 
-## Instrucciones FPU Utilizadas
+## Instrucciones x86 Utilizadas
 
 | Instrucción | Operación |
 |-------------|-----------|
-| `FLD`       | Carga un `double` desde memoria a la pila FPU |
-| `FLD1`      | Carga la constante 1.0 |
-| `FCOMIP`    | Compara ST(0) con ST(n), actualiza flags de CPU y saca ST(0) |
-| `FSUBP`     | Resta ST(1) - ST(0) y saca ST(0) |
-| `FSTP`      | Guarda ST(0) en memoria y lo saca de la pila FPU |
-| `FMUL`      | Multiplica dos registros de la pila FPU |
+| `LEA`       | Carga la dirección de memoria de una variable en un registro |
+| `MOV`       | Copia un valor entre registro y memoria |
+| `XOR`       | OR-exclusivo; usado para poner `EAX` en cero eficientemente |
+| `ADD`       | Suma el operando fuente al destino |
+| `LOOP`      | Decrementa `ECX` y salta si `ECX > 0` |
+| `CDQ`       | Extiende el signo de `EAX` hacia `EDX` formando un entero de 64 bits |
+| `IDIV`      | División entera con signo: cociente en `EAX`, resto en `EDX` |
+| `PUSH`      | Empuja un valor a la pila |
+| `CALL`      | Llama a un procedimiento |
 
 ---
 
 ## Ejemplo de Ejecución
 
 ```
---- Calculadora de Factorial (ASM Recursivo) ---
-Introduce un numero: 6
-El factorial de 6 es: 720
+Arreglo de entrada : {-10, 20, -30, 40, -50, 60}
+Suma acumulada     : 30
+Promedio (cociente): 5
+Residuo            : 0
 ```
 
 ---
 
 ## Requisitos
 
-- **Compilador:** MSVC (Visual Studio) con soporte para ensamblado MASM
+- **Ensamblador:** MASM (Microsoft Macro Assembler), incluido en Visual Studio
 - **Arquitectura:** x86 (32 bits), modo protegido plano (`flat`)
-- **Estándar C++:** C++11 o superior
+- **Sistema operativo:** Windows (uso de `ExitProcess@4` de la WinAPI)
+- **Convención de llamadas:** `stdcall`

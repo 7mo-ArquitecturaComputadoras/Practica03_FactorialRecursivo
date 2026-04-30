@@ -15,6 +15,7 @@
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{hyperref}
+\usepackage{xurl}
 \usepackage{fancyhdr}
 \usepackage{float}
 \usepackage{caption}
@@ -31,7 +32,8 @@
 
 \lstdefinelanguage{MASM}{
     morekeywords={PROC,ENDP,END,PUSH,POP,MOV,ADD,SUB,CALL,RET,JMP,
-                  JAE,FLD,FLD1,FCOMIP,FSUBP,FSTP,FMUL,DWORD,QWORD,PTR,EBP,ESP,ST},
+                  JAE,FLD,FLD1,FCOMIP,FSUBP,FSTP,FMUL,DWORD,QWORD,PTR,
+                  EBP,ESP,ST,.586,.model,.data,.code,flat,c},
     sensitive=false,
     morecomment=[l]{;}
 }
@@ -44,7 +46,11 @@
     numbers=left, numberstyle=\tiny\color{gray}, numbersep=8pt,
     frame=single, rulecolor=\color{gray!50},
     breaklines=true, captionpos=b, tabsize=4,
-    showstringspaces=false
+    showstringspaces=false,
+    literate=
+        {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+        {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+        {ñ}{{\~n}}1 {Ñ}{{\~N}}1 
 }
 
 \lstdefinestyle{cpp}{
@@ -57,7 +63,11 @@
     numbers=left, numberstyle=\tiny\color{gray}, numbersep=8pt,
     frame=single, rulecolor=\color{gray!50},
     breaklines=true, captionpos=b, tabsize=4,
-    showstringspaces=false
+    showstringspaces=false,
+    literate=
+        {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+        {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+        {ñ}{{\~n}}1 {Ñ}{{\~N}}1
 }
 
 % --- Encabezado ---
@@ -78,7 +88,7 @@
 
     {\Large \textbf{Universidad Autónoma de la Ciudad de México}}\\[0.3cm]
     {\large Licenciatura en Ingeniería de Software}\\[0.2cm]
-    {\large Arquitectura de computadoras}\\[2.5cm]
+    {\large Arquitectura de Computadoras}\\[2.5cm]
 
     \rule{\linewidth}{0.5pt}\\[0.4cm]
     {\LARGE \bfseries Práctica 03}\\[0.3cm]
@@ -100,15 +110,15 @@
 % ============================================================
 \section{Introducción}
 
-Esta practica consiste en calcular el \textbf{factorial} de un numero usando dos lenguajes al mismo tiempo: \textbf{C++} (entrada y salida de datos) y \textbf{ensamblador x86} (operación matemática). La idea es ver como un programa de alto nivel puede delegar trabajo a código ensamblador, que esta mas cerca del hardware.
+Esta práctica consiste en calcular el \textbf{factorial} de un número usando dos lenguajes al mismo tiempo: \textbf{C++} (entrada y salida de datos) y \textbf{ensamblador x86} (operación matemática). La idea es ver cómo un programa de alto nivel puede delegar trabajo a código ensamblador, que está más cerca del hardware.
 
-El factorial de un numero es multiplicar ese número por todos los enteros positivos menores que el. Por ejemplo:
+El factorial de un número es multiplicar ese número por todos los enteros positivos menores que él. Por ejemplo:
 
 \begin{equation}
     5! = 5 \times 4 \times 3 \times 2 \times 1 = 120
 \end{equation}
 
-Matematicamente, se puede definir de forma \textbf{recursiva} (es decir, usando la misma operación pero con un valor mas pequeno cada vez):
+Matemáticamente, se puede definir de forma \textbf{recursiva} (es decir, usando la misma operación pero con un valor más pequeño cada vez):
 
 \begin{equation}
     x! =
@@ -128,10 +138,10 @@ El proyecto tiene dos archivos que trabajan juntos:
     \caption{Archivos del proyecto}
     \begin{tabular}{@{}lp{9cm}@{}}
         \toprule
-        \textbf{Archivo} & \textbf{Que hace} \\
+        \textbf{Archivo} & \textbf{Qué hace} \\
         \midrule
         \texttt{main.cpp}      & Le pide un número al usuario, llama a la función ensambladora y muestra el resultado. \\
-        \texttt{Factorial.asm} & Contiene el calculo del factorial escrito en ensamblador. \\
+        \texttt{factorial.asm} & Contiene el cálculo del factorial escrito en ensamblador con instrucciones FPU. \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -150,9 +160,9 @@ El flujo del programa es sencillo:
 
 \subsection{Programa principal (main.cpp)}
 
-El código en C++ hace tres cosas: declarar que la función \texttt{Mi\_fact} existe en otro archivo, pedirle un numero al usuario, y mostrar el resultado.
+El código en C++ hace tres cosas: declarar que la función \texttt{Mi\_fact} existe en otro archivo, pedirle un número al usuario, y mostrar el resultado.
 
-\begin{lstlisting}[style=cpp, caption={main.cpp}]
+\begin{lstlisting}[style=cpp, caption={main.cpp --- Entrada, salida y llamada a la función ASM}]
 #include <iostream>
 using namespace std;
 
@@ -172,13 +182,13 @@ int main() {
 }
 \end{lstlisting}
 
-La linea \textbf{extern "C"} es el puente entre C++ y ASM. Le dice al compilador que no modifique el nombre de la función al momento de compilar, para que ambos archivos puedan encontrarse.
+La línea \textbf{extern "C"} es el puente entre C++ y ASM. Le dice al compilador que no modifique el nombre de la función al momento de compilar, para que ambos archivos puedan encontrarse sin problemas de decoración de nombres.
 
 \subsection{Función ensambladora (factorial.asm)}
 
-Aqui esta el nucleo del programa. La función recibe \texttt{x}, comprueba si es 1 o menos (caso base), y si no, se llama a si misma con \texttt{x - 1} y multiplica el resultado por \texttt{x}.
+Aquí está el núcleo del programa. La función recibe \texttt{x}, comprueba si es 1 o menos (caso base), y si no, se llama a sí misma con \texttt{x - 1} y multiplica el resultado por \texttt{x}.
 
-\begin{lstlisting}[language=MASM, caption={Factorial.asm}]
+\begin{lstlisting}[language=MASM, caption={factorial.asm --- Implementación recursiva con FPU}]
 .586
 .model flat, c
 
@@ -186,34 +196,34 @@ Aqui esta el nucleo del programa. La función recibe \texttt{x}, comprueba si es
 
 Mi_fact PROC
 
-    ; Preparar el espacio en memoria para trabajar
+    ; Preparar el marco de pila
     PUSH    EBP
     MOV     EBP, ESP
-    SUB     ESP, 8
+    SUB     ESP, 8             ; Reservar 8 bytes para la variable local (x - 1.0)
 
-    FLD     QWORD PTR [EBP+8]     ; Cargar el valor x
+    FLD     QWORD PTR [EBP+8]  ; Cargar el parametro x en la pila FPU -> ST(0) = x
 
     ; Comparar x con 1.0
-    FLD1                           ; Cargar 1.0
-    FCOMIP  ST(0), ST(1)           ; Comparar: 1.0 >= x?
-    JAE     es_caso_base           ; Si x <= 1, ir al caso base
+    FLD1                        ; ST(0) = 1.0, ST(1) = x
+    FCOMIP  ST(0), ST(1)        ; Comparar 1.0 con x; actualiza flags de CPU
+    JAE     caso_base           ; Si 1.0 >= x (es decir x <= 1), ir al caso base
 
-    ; x > 1: calcular x * factorial(x - 1)
-    FLD1
-    FSUBP   ST(1), ST(0)           ; Calcular x - 1
-    FSTP    QWORD PTR [EBP-8]      ; Guardar x - 1 temporalmente
+    ; x > 1: calcular x * Mi_fact(x - 1)
+    FLD1                        ; ST(0) = 1.0, ST(1) = x
+    FSUBP   ST(1), ST(0)        ; ST(0) = x - 1.0
+    FSTP    QWORD PTR [EBP-8]   ; Guardar (x - 1.0) en variable local y vaciar FPU
 
-    PUSH    DWORD PTR [EBP-4]
-    PUSH    DWORD PTR [EBP-8]
-    CALL    Mi_fact                ; Llamarse a si misma con (x - 1)
-    ADD     ESP, 8
+    PUSH    DWORD PTR [EBP-4]   ; Pasar (x-1.0) parte alta a la pila
+    PUSH    DWORD PTR [EBP-8]   ; Pasar (x-1.0) parte baja a la pila
+    CALL    Mi_fact             ; Llamada recursiva; resultado queda en ST(0)
+    ADD     ESP, 8              ; Limpiar el argumento de la pila
 
-    FMUL    QWORD PTR [EBP+8]      ; Multiplicar resultado por x
+    FMUL    QWORD PTR [EBP+8]   ; ST(0) = Mi_fact(x-1) * x
     JMP     fin
 
-es_caso_base:
-    FSTP    ST(0)                  ; Descartar x
-    FLD1                           ; Retornar 1.0
+caso_base:
+    FSTP    ST(0)               ; Descartar x de la FPU
+    FLD1                        ; Retornar 1.0 en ST(0)
 
 fin:
     MOV     ESP, EBP
@@ -225,9 +235,9 @@ END
 \end{lstlisting}
 
 % ============================================================
-\section{Como funciona la recursión}
+\section{Cómo funciona la recursión}
 
-Cada vez que la función se llama a si misma, guarda su estado actual en la \textbf{pila de memoria} resuelve el subproblema mas pequeño, y al regresar retoma donde se quedo.
+Cada vez que la función se llama a sí misma, guarda su estado actual en la \textbf{pila de memoria}, resuelve el subproblema más pequeño y, al regresar, retoma donde se quedó.
 
 Para \texttt{Mi\_fact(4.0)}, la cadena de llamadas es:
 
@@ -261,42 +271,42 @@ Para \texttt{Mi\_fact(4.0)}, la cadena de llamadas es:
 
 Cada nivel espera a que el nivel inferior termine, multiplica el resultado por su \texttt{x} y lo regresa al nivel superior.
 
-\begin{figure}[hbtp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{call_stack.png}
-    \caption{VS mostrando las llamadas apiladas de Mi\_fact.}
-    \label{fig:etiqueta}
+    \caption{Ventana Call Stack de Visual Studio mostrando las llamadas recursivas apiladas de \texttt{Mi\_fact}.}
+    \label{fig:call_stack}
 \end{figure}
 
 % ============================================================
 \section{La Unidad de Punto Flotante (FPU)}
 
-El numero se maneja como \texttt{double} (numero con decimales de 64 bits) porque asi lo requiere la interfaz con C++. Para operar con este tipo de dato, el ensamblador usa la \textbf{FPU}, un componente del procesador dedicado a la aritmetica con decimales. La FPU tiene su propia pequeña pila interna de registros llamados \texttt{ST0} a \texttt{ST7}.
+El número se maneja como \texttt{double} (número con decimales de 64 bits) porque así lo requiere la interfaz con C++. Para operar con este tipo de dato, el ensamblador usa la \textbf{FPU}, un componente del procesador dedicado a la aritmética con decimales. La FPU tiene su propia pequeña pila interna de registros llamados \texttt{ST(0)} a \texttt{ST(7)}.
 
-Las instrucciones FPU que usa esta practica son:
+Las instrucciones FPU que usa esta práctica son:
 
 \begin{table}[H]
     \centering
     \caption{Instrucciones FPU utilizadas}
     \begin{tabular}{@{}lp{8.5cm}@{}}
         \toprule
-        \textbf{Instrucción} & \textbf{Que hace en terminos simples} \\
+        \textbf{Instrucción} & \textbf{Qué hace en términos simples} \\
         \midrule
-        \texttt{FLD}    & Toma un numero de la memoria y lo coloca en la pila de la FPU. \\
-        \texttt{FLD1}   & Coloca directamente el valor 1.0 en la pila FPU. \\
-        \texttt{FCOMIP} & Compara dos numeros de la pila y le avisa al procesador cual es mayor. \\
-        \texttt{FSUBP}  & Resta los dos numeros del tope de la pila FPU. \\
-        \texttt{FSTP}   & Saca el numero del tope de la pila FPU y lo guarda en memoria. \\
-        \texttt{FMUL}   & Multiplica el tope de la pila por un numero en memoria. \\
+        \texttt{FLD}    & Toma un número de la memoria y lo coloca en la cima de la pila FPU (\texttt{ST(0)}). \\
+        \texttt{FLD1}   & Coloca directamente el valor 1.0 en la cima de la pila FPU. \\
+        \texttt{FCOMIP} & Compara \texttt{ST(0)} con otro registro FPU, actualiza los flags de la CPU y saca \texttt{ST(0)} de la pila. \\
+        \texttt{FSUBP}  & Resta los dos valores del tope de la pila FPU y saca el operando fuente. \\
+        \texttt{FSTP}   & Saca el valor del tope de la pila FPU y lo guarda en memoria. \\
+        \texttt{FMUL}   & Multiplica la cima de la pila FPU por un valor en memoria. \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-\begin{figure}[hbtp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.7\textwidth]{registros.png}
-    \caption{Ventana de registros con ST0-ST7 y sus valores númericos para 5!.}
-    \label{fig:etiqueta}
+    \includegraphics[width=1\textwidth]{registros.png}
+    \caption{Ventana con los registros FPU \texttt{ST(0)}--\texttt{ST(7)}. En este caso \texttt{ST(0)} $= 1.2 \times 10^2 = 120$}
+    \label{fig:registros}
 \end{figure}
 
 % ============================================================
@@ -310,27 +320,27 @@ Introduce un numero: 6
 El factorial de 6 es: 720
 \end{verbatim}
 
-\begin{figure}[hbtp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{consola.png}
-    \caption{Vista de la consola, donde el usuario interactua.}
-    \label{fig:etiqueta}
+    \caption{Consola de ejecución: el usuario introduce 6 y el programa devuelve 720.}
+    \label{fig:consola}
 \end{figure}
 
 % ============================================================
 \section{Repositorio GitHub}
 
-https://github.com/7mo-ArquitecturaComputadoras/Practica03\_FactorialRecursivo
+\url{https://github.com/7mo-ArquitecturaComputadoras/Practica03_FactorialRecursivo}
 
 % ============================================================
 \section{Conclusiones}
 
 \begin{itemize}
-    \item Fue posible combinar C++ con ensamblador de forma sencilla gracias a \texttt{extern "C"}, que actua como puente entre los dos lenguajes.
-    \item La recursión en ensamblador funciona igual que en cualquier lenguaje de alto nivel: cada llamada guarda su estado, espera el resultado del nivel inferior y continua. La diferencia es que en ensamblador todo ese manejo se hace instrucción por instrucción, de forma manual.
-    \item El uso de la FPU permite trabajar con numeros de 64 bits, lo que hace a la función compatible con el tipo \texttt{double} de C++.
-    \item Esta practica ayuda a entender lo que realmente ocurre dentro del procesador cada vez que un programa llama a una función, algo que los lenguajes de alto nivel ocultan automaticamente.
+    \item Fue posible combinar C++ con ensamblador de forma sencilla gracias a \texttt{extern "C"}, que actúa como puente entre los dos lenguajes al evitar la decoración de nombres del compilador.
+    \item La recursión en ensamblador funciona igual que en cualquier lenguaje de alto nivel: cada llamada guarda su estado en la pila, espera el resultado del nivel inferior y continúa. La diferencia es que en ensamblador todo ese manejo se hace instrucción por instrucción, de forma manual.
+    \item El uso de la FPU permite trabajar con números de 64 bits (\texttt{double}), lo que hace a la función compatible con el tipo \texttt{double} de C++ y garantiza precisión suficiente para los factoriales de números pequeños.
+    \item La instrucción \texttt{FCOMIP} es clave: compara dos valores en la pila FPU y actualiza directamente los flags enteros de la CPU, permitiendo usar saltos condicionales (\texttt{JAE}) sin necesidad de instrucciones adicionales de transferencia.
+    \item Esta práctica ayuda a entender lo que realmente ocurre dentro del procesador cada vez que un programa llama a una función recursiva, algo que los lenguajes de alto nivel ocultan automáticamente.
 \end{itemize}
 
 \end{document}
-
