@@ -76,8 +76,8 @@ Practica03_FactorialRecursivo/
 │   ├── Practica03_FactorialRecursivo.slnx           # Solución de Visual Studio
 │   ├── Practica03_FactorialRecursivo.vcxproj        # Proyecto MSBuild + MASM
 │   └── src/
-├── factorial.asm                                    # Función recursiva en x86 MASM
-└── main.cpp                                         # Interfaz C++ que llama a factorial()
+|       ├── factorial.asm                            # Función recursiva en x86 MASM
+|       └── main.cpp                                 # Interfaz C++ que llama a factorial()
 │
 ├── .gitattributes                                   # Normalización de finales de línea
 ├── .gitignore                                       # Archivos ignorados por Git
