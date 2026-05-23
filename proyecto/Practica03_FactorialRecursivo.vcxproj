@@ -128,7 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <MASM Include="factorial.asm" />
+    <MASM Include="src\factorial.asm" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
