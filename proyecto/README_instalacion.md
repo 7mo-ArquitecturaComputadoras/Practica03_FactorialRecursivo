@@ -80,11 +80,8 @@ Si aparece un número de versión, todo está listo.
 Abre el **Símbolo del sistema** (`cmd`) o **Git Bash**, ubícate en la carpeta donde quieras guardar el proyecto y ejecuta:
 
 ```bash
-git clone <url-del-repositorio>
-cd Practica03_FactorialRecursivo
+git clone git@github.com:7mo-ArquitecturaComputadoras/Practica03_FactorialRecursivo.git
 ```
-
-> 💡 Reemplaza `<url-del-repositorio>` por el enlace HTTPS o SSH del repositorio en GitHub/GitLab.
 
 ---
 
