@@ -66,10 +66,7 @@ Practica03_FactorialRecursivo/
 │   ├── README_compilacion_latex.md                  # Cómo compilar el .tex a PDF
 │   ├── reporte.pdf                                  # Reporte ya compilado
 │   ├── reporte.tex                                  # Reporte técnico en LaTeX
-│   └── imagenes/
-│       ├── call_stack.png
-│       ├── consola.png
-│       └── registros.png
+│   └── imagenes/                                    # Imágenes usadas en el reporte
 │
 ├── proyecto/
 │   ├── README_instalacion.md                        # Guía de instalación y puesta en marcha
@@ -94,7 +91,12 @@ La guía detallada con todos los pasos está en:
 
 Resumen rápido:
 
-1. `git clone <url-del-repositorio>`
+1. Abre el **Símbolo del sistema** (`cmd`) o **Git Bash**, ubícate en la carpeta donde quieras guardar el proyecto y ejecuta:
+
+```bash
+git clone git@github.com:7mo-ArquitecturaComputadoras/Practica03_FactorialRecursivo.git
+```
+
 2. Abrir `proyecto/Practica03_FactorialRecursivo.slnx` en Visual Studio
 3. Seleccionar **Debug | Win32**
 4. Compilar con `Ctrl + Shift + B` y ejecutar con `F5`
