@@ -38,7 +38,7 @@ Antes de empezar, conviene entender qué hace cada programa:
 | **Git** | [https://git-scm.com/download/win](https://git-scm.com/download/win) |
 | **Visual Studio Community** (gratuito) | [https://visualstudio.microsoft.com/es/downloads/](https://visualstudio.microsoft.com/es/downloads/) |
 
-> ⚠️ Esta práctica solo se compila en **Windows**, porque el código usa `ExitProcess` de la WinAPI. No funciona nativamente en Linux ni macOS.
+> ⚠️ Esta práctica solo se compila en **Windows**, porque el código usa convención `cdecl` con MASM x86 (32 bits).
 
 ---
 
