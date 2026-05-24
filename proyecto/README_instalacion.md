@@ -38,7 +38,7 @@ Antes de empezar, conviene entender qué hace cada programa:
 | **Git** | [https://git-scm.com/download/win](https://git-scm.com/download/win) |
 | **Visual Studio Community** (gratuito) | [https://visualstudio.microsoft.com/es/downloads/](https://visualstudio.microsoft.com/es/downloads/) |
 
-> ⚠️ Esta práctica solo se compila en **Windows**, porque el código usa convención `cdecl` con MASM x86 (32 bits).
+> ⚠️ Esta práctica solo se compila en **Windows**, porque el código usa convención `cdecl` con MASM x86 (32 bits) y la interfaz estándar de C++ (`iostream`). No funciona nativamente en Linux ni macOS.
 
 ---
 
@@ -132,26 +132,23 @@ El ejecutable se generará en `proyecto/Debug/Practica03_FactorialRecursivo.exe`
 
 ## 7️⃣ Ejecutar y observar el resultado
 
-El programa **no imprime nada en pantalla**: calcula el factorial recursivamente, almacenando el resultado en registros y memoria. Para ver el resultado tienes que inspeccionar los registros y la memoria con el depurador.
+El programa **solicita un número** e **imprime el resultado** en consola. Para inspeccionar la FPU durante la ejecución, usa el depurador:
 
 1. Abre `proyecto/src/factorial.asm` en el editor de Visual Studio.
-2. Coloca un *breakpoint* (punto de interrupción) haciendo clic en el margen izquierdo, justo en la línea de la etiqueta:
+2. Coloca un *breakpoint* haciendo clic en el margen izquierdo, en la línea de la etiqueta:
 
    ```asm
    fin:
-       push 0
-       call ExitProcess@4
+       MOV     ESP, EBP
+       POP     EBP
+       RET
    ```
 
 3. Pulsa `F5` para iniciar la depuración. El programa se detendrá en el *breakpoint*.
-4. Ve al menú **Depurar** → **Ventanas** → **Registros** para ver los registros x86 (EAX, EBX, ECX, EDX, etc.).
-5. Para ver el resultado en memoria, ve a **Depurar** → **Ventanas** → **Memoria** → **Memoria 1** y escribe:
+4. Ve al menú **Depurar** → **Ventanas** → **Registros** para ver los registros de la FPU (`ST0`–`ST7`).
+5. El resultado estará en `ST(0)`. Para una entrada de `5`, verás `120.0` en el tope de la pila FPU.
 
-   ```
-   &resultado
-   ```
-
-6. Verás los 4 bytes del resultado en memoria. Para una entrada de `5`, por ejemplo, debería mostrar `78 00 00 00` (que representa `120` en formato DWORD little-endian, ya que 5! = 120).
+> 💡 También puedes inspeccionar la pila de la FPU completa en **Depurar** → **Ventanas** → **Registros** habilitando la opción **Flotante** en el menú contextual del panel.
 
 > 💡 También puedes pasar el ratón sobre nombres de variables en el código mientras el depurador está pausado; aparecerá una pequeña ventana con los valores actuales.
 
@@ -161,7 +158,7 @@ El programa **no imprime nada en pantalla**: calcula el factorial recursivamente
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
-| `error A2006: undefined symbol : ExitProcess` | Configuración en **x64** con código de 32 bits | Cambia la plataforma a **Win32** en la barra superior |
+| `error LNK2019: unresolved external symbol _Mi_fact` | El símbolo no se exporta con la convención `c` | Verifica que `factorial.asm` use `.model flat, c` y declare `Mi_fact PROC` |
 | `error MSB6006: "ml.exe" exited with code 1` | Ruta del archivo `.asm` rota | Verifica que `proyecto/src/factorial.asm` exista |
 | **masm(.targets, .props)** no aparece en *Personalizaciones de compilación* | Falta la carga de trabajo *Desarrollo C++* | Abre **Visual Studio Installer**, pulsa **"Modificar"** y agrégala |
 | `git` no se reconoce como comando | Git no se instaló o no se agregó al PATH | Reinstala Git marcando *"Git from the command line and also from 3rd-party software"* |

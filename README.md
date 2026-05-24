@@ -1,6 +1,6 @@
 # 🔢 Práctica 03 — Cálculo de Factorial con Recursividad en Ensamblador x86
 
-Programa escrito en **ensamblador x86 (MASM)** con interfaz en **C++** que calcula el **factorial** de un número mediante un **algoritmo recursivo puro**, operando directamente sobre los registros del procesador, sin usar funciones externas de librerías estándar.
+Programa mixto **ensamblador x86 (MASM) + C++** que calcula el **factorial** de un número real positivo mediante un **algoritmo recursivo con FPU** (*Floating Point Unit*). La función ensambladora `Mi_fact` recibe el argumento como `double` (64 bits), usa la pila de la FPU para comparar, restar y multiplicar en punto flotante, y retorna el resultado en `ST(0)` siguiendo la convención `cdecl`.
 
 ---
 
@@ -18,42 +18,61 @@ Programa escrito en **ensamblador x86 (MASM)** con interfaz en **C++** que calcu
 
 ## 🎯 ¿Qué hace el programa?
 
-El programa toma un número entero declarado en la sección `.data` (por ejemplo, `n = 5`) y calcula su **factorial de forma recursiva** mediante llamadas de función encadenadas que construyen un stack de activación:
+El programa toma un número real positivo ingresado desde C++ (por ejemplo, `5.0`) y calcula su **factorial de forma recursiva** usando la FPU del procesador:
 
-- Cada invocación recursiva decrementa el número
-- Cuando llega al **caso base** (`n = 0` o `n = 1`), retorna `1`
-- Las invocaciones anteriores multiplican sus resultados en cadena
-- El resultado final se almacena en un registro o variable en memoria
+- El argumento viaja a la función como `double` (64 bits, dos `DWORD` en la pila)
+- Cada llamada recursiva reduce el valor en `1.0` hasta el **caso base** (`x ≤ 1.0`)
+- Cuando llega al caso base, la FPU retorna `1.0` en `ST(0)`
+- Las invocaciones anteriores multiplican sus resultados en cadena con `FMUL`
+- El resultado final queda en `ST(0)` al retornar al llamador
 
-El resultado es un cálculo puro recursivo: `5! = 5 × 4 × 3 × 2 × 1 = 120`, todo operando sobre la pila (stack) del procesador.
+El resultado es: `5! = 5.0 × 4.0 × 3.0 × 2.0 × 1.0 = 120.0`
 
 ---
 
 ## 🧠 Idea central del algoritmo
 
-Aprovecha el **mecanismo de llamadas de función** (CALL/RET) para manejar recursividad. Cada nivel de recursión almacena su estado en el stack mediante PUSH/POP:
+La función `Mi_fact` usa la **FPU** para todo el cálculo. El argumento se recibe como `QWORD PTR [EBP+8]` (un `double` de 64 bits), y la comparación con el caso base se hace en la pila de la FPU con `FCOMIP`:
 
 ```
-Factorial(n):
-    si n <= 1
-        retornar 1
+Mi_fact(x):
+    si x <= 1.0
+        retornar 1.0             ← FLD1 → ST(0) = 1.0
     si no
-        temp = Factorial(n - 1)
-        retornar n * temp
+        y = x - 1.0              ← FSUBP en FPU
+        temp = Mi_fact(y)        ← CALL recursivo (y en pila como QWORD)
+        retornar x * temp        ← FMUL QWORD PTR [EBP+8]
 ```
 
-### Flujo de ejecución (n=5)
+### Flujo de ejecución (x=5.0)
 
 ```
-Factorial(5)
-  └─ Factorial(4)
-      └─ Factorial(3)
-          └─ Factorial(2)
-              └─ Factorial(1)  → CASO BASE, retorna 1
-              ← retorna 2*1 = 2
-          ← retorna 3*2 = 6
-      ← retorna 4*6 = 24
-  ← retorna 5*24 = 120
+Mi_fact(5.0)
+  └─ Mi_fact(4.0)
+      └─ Mi_fact(3.0)
+          └─ Mi_fact(2.0)
+              └─ Mi_fact(1.0)  → CASO BASE: FLD1 → ST(0) = 1.0
+              ← FMUL 2.0 → ST(0) = 2.0
+          ← FMUL 3.0 → ST(0) = 6.0
+      ← FMUL 4.0 → ST(0) = 24.0
+  ← FMUL 5.0 → ST(0) = 120.0
+```
+
+### Manejo del argumento `double` en la pila
+
+Dado que un `double` ocupa 64 bits, se pasa a la función como dos `DWORD` consecutivos. Dentro de `Mi_fact`, se carga con:
+
+```asm
+FLD QWORD PTR [EBP+8]   ; carga el double completo desde la pila a ST(0)
+```
+
+Al hacer la llamada recursiva con `(x - 1.0)`, el resultado de `FSUBP` se guarda primero en una variable local `[EBP-8]` con `FSTP QWORD PTR [EBP-8]`, y luego se empuja a la pila en dos partes:
+
+```asm
+PUSH DWORD PTR [EBP-4]  ; parte alta del double
+PUSH DWORD PTR [EBP-8]  ; parte baja del double
+CALL Mi_fact
+ADD  ESP, 8             ; limpiar los 8 bytes del argumento
 ```
 
 ---
@@ -73,8 +92,8 @@ Practica03_FactorialRecursivo/
 │   ├── Practica03_FactorialRecursivo.slnx           # Solución de Visual Studio
 │   ├── Practica03_FactorialRecursivo.vcxproj        # Proyecto MSBuild + MASM
 │   └── src/
-|       ├── factorial.asm                            # Función recursiva en x86 MASM
-|       └── main.cpp                                 # Interfaz C++ que llama a factorial()
+│       ├── factorial.asm                            # Función Mi_fact en x86 MASM (FPU)
+│       └── main.cpp                                 # Interfaz C++ que llama a Mi_fact()
 │
 ├── .gitattributes                                   # Normalización de finales de línea
 ├── .gitignore                                       # Archivos ignorados por Git
@@ -89,7 +108,7 @@ La guía detallada con todos los pasos está en:
 
 ➡️ **[Guía de instalación y puesta en marcha](proyecto/README_instalacion.md)**
 
-Resumen rápido:
+Resumen rápido para quien ya tiene el entorno listo:
 
 1. Abre el **Símbolo del sistema** (`cmd`) o **Git Bash**, ubícate en la carpeta donde quieras guardar el proyecto y ejecuta:
 
@@ -97,43 +116,56 @@ Resumen rápido:
 git clone git@github.com:7mo-ArquitecturaComputadoras/Practica03_FactorialRecursivo.git
 ```
 
-2. Abrir `proyecto/Practica03_FactorialRecursivo.slnx` en Visual Studio
-3. Seleccionar **Debug | Win32**
-4. Compilar con `Ctrl + Shift + B` y ejecutar con `F5`
+2. Abrir `proyecto/Practica03_FactorialRecursivo.slnx` en Visual Studio.
+3. Seleccionar configuración **Debug | Win32**.
+4. Compilar con `Ctrl + Shift + B` y ejecutar con `Ctrl + F5`.
+5. Ingresar el número cuando el programa lo solicite.
 
 ---
 
 ## 🔍 Trazado del ejemplo `n=5`
 
-| Función | n | Caso Base | Retorna |
-|---------|---|-----------|---------|
-| Factorial(5) | 5 | No | 5 × Factorial(4) |
-| Factorial(4) | 4 | No | 4 × Factorial(3) |
-| Factorial(3) | 3 | No | 3 × Factorial(2) |
-| Factorial(2) | 2 | No | 2 × Factorial(1) |
-| Factorial(1) | 1 | **Sí** | **1** |
-| ← Factorial(2) | | | 2 × 1 = **2** |
-| ← Factorial(3) | | | 3 × 2 = **6** |
-| ← Factorial(4) | | | 4 × 6 = **24** |
-| ← Factorial(5) | | | 5 × 24 = **120** |
+### Pila de la FPU por nivel de recursión
 
-Resultado final: **120**
+| Llamada    | Acción en FPU                               | ST(0) al retornar |
+|------------|---------------------------------------------|-------------------|
+| Mi_fact(5.0) | `FLD [EBP+8]` → carga 5.0; llama Mi_fact(4.0); `FMUL [EBP+8]` | 120.0 |
+| Mi_fact(4.0) | `FLD [EBP+8]` → carga 4.0; llama Mi_fact(3.0); `FMUL [EBP+8]` | 24.0 |
+| Mi_fact(3.0) | `FLD [EBP+8]` → carga 3.0; llama Mi_fact(2.0); `FMUL [EBP+8]` | 6.0 |
+| Mi_fact(2.0) | `FLD [EBP+8]` → carga 2.0; llama Mi_fact(1.0); `FMUL [EBP+8]` | 2.0 |
+| Mi_fact(1.0) | `FCOMIP ST(0),ST(1)` → 1.0 ≥ 1.0 → `JAE caso_base`; `FLD1` | **1.0** |
+
+### Resultado final
+
+`ST(0) = 120.0` → C++ recibe el `double` y lo imprime como `120`
 
 ---
 
 ## 📘 Instrucciones x86 utilizadas
 
+### FPU (*Floating Point Unit*)
+
 | Instrucción | Operación |
 |-------------|-----------|
-| `CALL` | Llama a un procedimiento |
-| `RET` | Retorna de un procedimiento |
-| `PUSH` | Empuja valor a la pila |
-| `POP` | Saca valor de la pila |
-| `CMP` | Compara dos valores |
-| `JLE` / `JG` | Saltos condicionales |
-| `MOV` | Copia un valor |
-| `IMUL` | Multiplicación entera |
-| `SUB` | Resta |
+| `FLD`       | Carga un `double` (64 bits) desde memoria al tope de la pila FPU |
+| `FLD1`      | Carga la constante `1.0` al tope de la pila FPU |
+| `FCOMIP`    | Compara `ST(0)` con `ST(1)` y hace *pop*; actualiza banderas enteras (ZF, CF, PF) |
+| `FSUBP`     | Resta `ST(1) = ST(1) − ST(0)` y hace *pop*; calcula `x − 1.0` |
+| `FSTP`      | Guarda `ST(0)` en memoria y hace *pop*; almacena `(x − 1.0)` en variable local |
+| `FMUL`      | Multiplica `ST(0)` por el operando de memoria; acumula `resultado × x` |
+
+### Propósito general
+
+| Instrucción    | Operación |
+|----------------|-----------|
+| `PUSH` / `POP` | Prólogo/epílogo del marco de pila (`EBP`) y paso del argumento `double` (2 × `DWORD`) |
+| `MOV`          | Configura el marco de pila (`MOV EBP, ESP`) y restaura el stack (`MOV ESP, EBP`) |
+| `SUB`          | Reserva espacio para la variable local de 8 bytes en la pila (`SUB ESP, 8`) |
+| `ADD`          | Limpia los 8 bytes del argumento `double` tras la llamada recursiva (`ADD ESP, 8`) |
+| `JAE`          | Salta al caso base si `1.0 ≥ x` (resultado de `FCOMIP`) |
+| `JMP`          | Salto incondicional desde el bloque recursivo hacia `fin:` |
+| `CALL`         | Llama recursivamente a `Mi_fact` |
+| `RET`          | Retorna al llamador; el resultado `double` permanece en `ST(0)` |
 
 ---
 
@@ -141,9 +173,10 @@ Resultado final: **120**
 
 | Documento | Descripción |
 |---|---|
-| 🛠️ [`README_instalacion.md`](proyecto/README_instalacion.md) | Instalación y compilación paso a paso |
-| 📄 [`README_compilacion_latex.md`](documentacion/README_compilacion_latex.md) | Cómo compilar el reporte desde LaTeX |
-| 📕 [`reporte.pdf`](documentacion/reporte.pdf) | Reporte técnico compilado |
+| 🛠️ [`README_instalacion.md`](proyecto/README_instalacion.md) | Cómo instalar Git, Visual Studio con MASM, compilar y ejecutar el programa paso a paso. |
+| 📄 [`README_compilacion_latex.md`](documentacion/README_compilacion_latex.md) | Cómo regenerar el PDF del reporte a partir de `reporte.tex` usando TeX Live, Geany o VS Code, tanto en Linux como en Windows. |
+| 📕 [`reporte.pdf`](documentacion/reporte.pdf) | Reporte técnico ya compilado, con análisis detallado del algoritmo FPU y el stack de recursión. |
+| 📝 [`reporte.tex`](documentacion/reporte.tex) | Fuente LaTeX del reporte técnico. |
 
 ---
 
